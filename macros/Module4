@@ -1,0 +1,175 @@
+'########## Mod 4 for User to customize headers. ##############
+
+'Add selected listbox headers to list via BUTTON on <Main>
+Sub AddingHeaders()
+
+    Dim selectedHeader As String
+    
+    selectedHeader = Range("I2").Value  'Drop list box value user selected.
+    Sheets("TempSheet").Select
+    lFirstRow = 4 'Start row
+    lLastRow = Cells(Rows.Count, 13).End(xlUp).Row     'Get last row
+    
+    For i = lFirstRow To lLastRow + 1
+        If Cells(i, 13) = "" Then
+            Cells(i, 13) = selectedHeader
+            Call updateHeadersArry
+            Sheets("Main").Select
+            Exit Sub
+        ElseIf Cells(i, 13) = selectedHeader Then
+            MsgBox "You have already added the selected header."
+            Sheets("Main").Select
+            Exit Sub
+        End If
+    Next
+    Sheets("Main").Select
+
+End Sub
+
+'To clear the allocated cells in TEMP/ remove all headers selected.
+Sub RemovingHeaders()
+    
+    Sheets("TempSheet").Select
+    Range("M4").Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Selection.ClearContents
+    Sheets("Main").Select
+    MsgBox "Current selection for additional headers is Empty."
+    
+End Sub
+'Update / clear and reload headers value into the array everytime user run macro.
+Function updateHeadersArry() As Variant
+
+    'Dim AdditionalHeadersVal() As Variant
+    With Sheets("TempSheet")
+        Range("M4").Select
+        Lrow = .Range("M" & .Rows.Count).End(xlUp).Row
+    End With
+
+    Sheets("TempSheet").Select
+    numHeaders = Lrow - 3   'number of arrays / headers
+
+    ReDim AdditionalHeadersVal(numHeaders)
+   
+    For i = 4 To Lrow
+        AdditionalHeadersVal(i - 3) = Cells(i, 13).Value
+    Next
+    
+    'headersCnt = UBound(AdditionalHeadersVal)
+'    cnt = 1
+'    While cnt <= UBound(AdditionalHeadersVal)
+'        MsgBox AdditionalHeadersVal(cnt)
+'        cnt = cnt + 1
+'    Wend
+    
+    updateHeadersArry = AdditionalHeadersVal    ' return array
+    AnyCustomHeaders = True
+
+End Function
+
+'When adding items also add custom headers under item grouping as they share lastrow.
+Function chkCusHeadExits() As Boolean
+
+    'Check if user added any headers to be included and set Flag.
+    Dim arrayHeaders() As Variant
+    arrayHeaders = updateHeadersArry()
+    headersCnt = UBound(arrayHeaders)
+    
+    If headersCnt > 0 Then
+        chkCusHeadExits = True
+    Else
+        chkCusHeadExits = False
+    End If
+
+End Function
+
+'When adding items also add custom headers under item grouping as they share lastrow.
+Function addCusHeaders()
+
+    Dim arrayHeaders() As Variant
+    arrayHeaders = updateHeadersArry()
+    headersCnt = UBound(arrayHeaders)
+    
+    Sheets("Main").Select
+    startCol = 10
+    lLastRow = Cells(Rows.Count, 6).End(xlUp).Row
+
+    Sheets("Json").Select
+    'Need to loop from itemID current to last row in Json sheet for additional headers(Global Var)
+    For K = JsonCurrentRow + 1 To JsonLastRow
+        
+        testCase = Trim(Cells(K, 2))
+        'Loop each headers user add.
+        For loopHeaders = 1 To headersCnt
+            keyWord = "*" & arrayHeaders(loopHeaders) & "*"
+            Select Case True
+                '----- CASE : Customize Headers -----
+                Case testCase Like keyWord
+                ' split the string in the cell in an array for group id
+                fieldData = getText(testCase)
+                Cells(K, 3) = fieldData
+                
+                'call func to add the header and data to main under itemID
+                Call addMainHeadersData(arrayHeaders(loopHeaders), fieldData, headersCnt)
+                Sheets("Json").Select
+                Exit For    'exit loop if found any header and cont next row.
+            End Select
+        Next
+        
+'        'Check if header is invalid and not in JSON.
+'        If K = JsonLastRow And headerFound = False Then
+'            MsgBox "Unable to find this header. Please check your keyword header is valid."
+'        End If
+    
+    Next
+    
+End Function
+
+' To check and add customize headers data.
+Function addMainHeadersData(headerName, headerData, headersCnt)
+
+    Sheets("Main").Select
+    'lastCol = Cells(4, Columns.Count).End(xlToLeft).Column
+    lastRow = Cells(Rows.Count, 6).End(xlUp).Row
+    
+    'Loop thru numbers for headers for match.
+    For numHeaders = 1 To headersCnt
+        If Range("I4").Offset(0, numHeaders) = headerName Then
+            Cells(lastRow, 9).Offset(1, numHeaders) = headerData
+            Exit For
+        End If
+    Next
+    
+End Function
+'Function to add and remove before hand Headers Only.
+Function addRemHeaders()
+
+    Sheets("Main").Select
+    
+    'Remove exisitng new headers clean up first.
+    Range("J4").Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    Selection.Delete Shift:=xlToLeft
+    
+    'Check if no headers added then exit func.
+    If chkCusHeadExits() = False Then
+        Exit Function
+    End If
+    
+    Dim arrayHeaders() As Variant
+    arrayHeaders = updateHeadersArry()
+    headersCnt = UBound(arrayHeaders)
+    
+    Sheets("Main").Select
+    
+    'loop thru new headers and add in.
+    For numHeaders = 1 To headersCnt
+        Range("I4").Select
+        Selection.Copy
+        Range("I4").Offset(0, numHeaders).Select
+        ActiveSheet.Paste
+        Range("I4").Offset(0, numHeaders) = arrayHeaders(numHeaders)
+    Next
+    
+ End Function
+    

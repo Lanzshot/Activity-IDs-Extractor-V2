@@ -1,0 +1,179 @@
+'######## Name: Activity ID Exctractor, AIDE    ########### Version:V2
+'######## Created Dtd: 27 June 2022
+'######## Uses: For ease of extracting Activitys IDs from Json paste in wkbk. Added optionals headers for user to add.
+'######## By: Lan ZS. Accepts paypal,cheque and of cos cash donos.
+'######## Last Mod Dtd: 13 Sep 2022.
+'######## Fixes:
+
+Public ItemCheckFlag As Boolean
+Public JsonCurrentRow As Integer
+Public JsonLastRow As Integer
+
+'-------------------------------MAIN---------------------------------------------
+
+Sub mainStart()
+'    Call applyFormat       '<<For Testing>>
+'    Exit Sub
+
+    Call hideMySheets(False)    'For showing hiding / unhiding Sheets.
+
+    Dim i As Long, lFirstRow As Long, lLastRow As Long
+    Dim lColFrom As Long, lColTo As Long
+    
+    'Prep custom headers first if any.
+    Call addRemHeaders
+      
+      ' define source column number and the destination one:
+      lColFrom = 2  'start col is B
+      lColTo = 3
+      ItemCheckFlag = False     'Use to check when group_id should be end of line.
+    
+      Sheets("Json").Select
+      
+      ' initialize range to analyze:
+      lFirstRow = 1 'Start row is default 1
+      lLastRow = Cells(Rows.Count, 2).End(xlUp).Row     'Get last row
+    
+        If lLastRow <= 1 Then
+            MsgBox "Please add the Json to begin the extractions!!!"
+            Call hideMySheets(True)
+            Exit Sub
+        End If
+         
+        'Issue where Trim dosen't work when user save as another non office wordpad change the spaces.
+        'Replace non space with normal space for user Json file. <V1b>
+        Columns("B:B").Select
+        Selection.Replace What:=" ", Replacement:=" ", LookAt:=xlPart, _
+        SearchOrder:=xlByRows, MatchCase:=False, FormulaVersion:= _
+        xlReplaceFormula2
+        
+      ' loop over the rows in Json sheet.
+      For i = lFirstRow To lLastRow
+        
+        'checkif string contains "group_id", "packageId",item_id, "name", "out_item_id"
+        'if either one for the above go to correspond function to populate
+        testCase = Trim(Cells(i, lColFrom))
+              
+        Select Case True
+
+            ' ----- CASE 1: group_id -----
+            Case testCase Like "*group_id*"
+
+                ' split the string in the cell in an array for group id
+                groupID = getText(testCase)
+                Cells(i, lColTo) = groupID
+
+                ' split the string in the cell in an array for name part
+                testCase = Cells(i + 1, lColFrom)
+                GroupName = getText(testCase)
+                Cells(i + 1, lColTo) = GroupName
+
+                'pass both var tabulate Main table for Group_id
+                Call appendMainSheet(groupID, GroupName, "GroupID")
+
+            ' ----- CASE 2: packageId -----
+            Case testCase Like "*packageId*"
+
+                ' split the string in the cell in an array for package id
+                packageID = getText(testCase)
+                Cells(i, lColTo) = packageID
+
+                ' split the string in the cell in an array for name part
+                testCase = Cells(i + 1, lColFrom)
+                packageName = getText(testCase)
+                Cells(i + 1, lColTo) = packageName
+                
+                'pass both var tabulate Main table for both out & item_id
+                JsonCurrentRow = i     'share current row in JSON for additional headers to cont searching.
+                JsonLastRow = lLastRow
+
+                'pass both var tabulate Main table for package_id
+                Call appendMainSheet(packageID, packageName, "PackageID")
+
+            '  ----- CASE 3: item_id -----
+             Case testCase Like "?item_id*" '"item_id": "item-f08k8oqbi8r","name": "??"
+
+                ' split the string in the cell in an array for both out and item id
+                ItemID = getText(testCase)
+                Cells(i, lColTo) = ItemID
+
+                ' split the string in the cell in an array for both name and number.
+                testCase = Cells(i + 1, lColFrom)
+                itemName = getText(testCase)
+                Cells(i + 1, lColTo) = itemName
+
+                Call appendMainSheet(ItemID, itemName, "itemID")
+
+               ItemCheckFlag = True 'Flag to show group and package id is not the 1st instance and base on recurring item as lastrow.
+
+              '  ----- CASE 4: out_item_id -----
+             Case testCase Like "?out_item_id*"  '  "out_item_id": "4", "number": 350,
+
+                ' split the string in the cell in an array for both out and item id
+                outItemID = getText(testCase)
+                Cells(i, lColTo) = outItemID
+
+                ' split the string in the cell in an array for both name and number.
+                testCase = Cells(i + 1, lColFrom)
+                itemNum = getText(testCase)
+                Cells(i + 1, lColTo) = itemNum
+
+                'pass both var tabulate Main table for both out & item_id
+                Call appendMainSheet(outItemID, itemNum, "outItemID")
+
+                ItemCheckFlag = True 'Flag to show group and package id is not the 1st instance and base on recurring item as lastrow.
+
+             ' ----- CASE 5: activity_id -----
+             Case testCase Like "*activity_id*"
+
+                ' split the string in the cell in an array for activityid
+                activityID = getText(testCase)
+                Cells(i, lColTo) = activityID
+
+               'pass both var tabulate Main table for Activity_id
+                Call appendMainSheet(activityID, nilName, "ActivityID")
+
+        End Select
+         
+'====For user customise header selections!!!=====
+'        If headersCnt > 0 Then
+'            For loopHeaders = 1 To headersCnt
+'
+'            keyWord = "*" & arrayHeaders(loopHeaders) & "*"
+'
+'                Select Case True
+'
+'                ' ----- CASE : group_id -----
+'                Case testCase Like keyWord
+'                    ' split the string in the cell in an array for group id
+'                    fieldData = getText(testCase)
+'                    Cells(i, lColTo) = fieldData
+'                    ItemCheckFlag = True    'Flag to show group and package id is not the 1st instance and base on recurring item as lastrow.
+'
+'    '                ' split the string in the cell in an array for name part
+'    '                testCase = Cells(i + 1, lColFrom)
+'    '                GroupName = getText(testCase)
+'    '                Cells(i + 1, lColTo) = GroupName
+'
+'                    'pass both limit and header name to Main table.
+'                    Call appendMainSheet(fieldData, arrayHeaders(loopHeaders), "customHeaders")
+'
+'                End Select
+'            Next
+'        End If
+
+        
+
+      Next
+      
+    Call applyFormat
+    Call hideMySheets(True)
+    
+    Sheets("Main").Select
+    MsgBox "Macro Run Done!!!"
+   
+End Sub
+
+'-------------------------------END of MAIN---------------------------------------------
+
+
